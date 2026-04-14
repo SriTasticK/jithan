@@ -1,4 +1,5 @@
 import os
+from google.genai import types
 
 
 def get_file_content(working_directory, file_path):
@@ -36,3 +37,18 @@ def get_file_content(working_directory, file_path):
             "Error: Looks like there is some error in the "
             "standard library functions that you call"
         ) from e
+
+schema_get_file_content = types.FunctionDeclaration(
+    name="get_file_content",
+    description="Read the contents of a file within the working directory.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="Relative path to the file to read."
+            )
+        },
+        required=["file_path"]
+    )
+)
