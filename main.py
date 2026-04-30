@@ -18,32 +18,63 @@ parser.add_argument("user_prompt", type=str, help="User prompt")
 parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
 args = parser.parse_args()
 messages = [types.Content(role="user", parts=[types.Part(text=args.user_prompt)])]
-response = client.models.generate_content(model=model_name, contents=messages, config=types.GenerateContentConfig(system_instruction=system_prompt, temperature=0, tools=[available_functions]))
+for each in range(20):
+    response = client.models.generate_content(
+        model=model_name,
+        contents=messages,
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            temperature=0,
+            tools=[available_functions]
+        )
+    )
 
-if args.verbose:
-    print(f"User prompt: {args.user_prompt}")
-    print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
-    print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
+    # Append model response
+    if response.candidates:
+        candidate = response.candidates[0]
+        if candidate.content:
+            messages.append(candidate.content)
 
-function_results = []
+    if args.verbose:
+        print(f"Iteration: {each}")
+        print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
+        print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
 
-if not response.function_calls:
-    print(response.text)
-else:
+    # Final answer
+    if not response.function_calls:
+        print("Final response:")
+        print(response.text)
+        break
+
+    function_results = []
+
     for function_call in response.function_calls:
-        function_call_result = call_function(function_call)
+        if args.verbose:
+            print(f"Calling function: {function_call.name}")
 
-        if not function_call_result.parts:
+        result = call_function(function_call)
+
+        if not result.parts:
             raise Exception("Function call returned no parts")
 
-        function_response = function_call_result.parts[0].function_response
-        if function_response is None:
+        part = result.parts[0]
+
+        if part.function_response is None:
             raise Exception("Function response was None")
 
-        if function_response.response is None:
+        if part.function_response.response is None:
             raise Exception("Function response payload was None")
 
-        function_results.append(function_call_result.parts[0])
+        function_results.append(part)
 
         if args.verbose:
-            print(f"-> {function_response.response}")
+            print(f"-> {part.function_response.response}")
+
+    # Append tool results (FIXED ROLE)
+    messages.append(
+        types.Content(role="tool", parts=function_results)
+    )
+
+else:
+    print("Error: Agent did not complete within 20 iterations.")
+    exit(1)
